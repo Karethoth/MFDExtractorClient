@@ -1,0 +1,6 @@
+bin
+obj
+*.swp
+*.o
+client
+dclient
