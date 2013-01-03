@@ -1,7 +1,7 @@
 #include "main.h"
 
 #define WIDTH 1024
-#define HEIGHT 600
+#define HEIGHT 1200
 #define DEPTH 32
 #define BPP 6
 
@@ -48,13 +48,10 @@ void DrawScreen( SDL_Surface *screen, short imgW, short imgH )
       x = 0;
     }
 
-    if( x < 750 ||
-        y < 290 )
-      continue;
-
     short translateX=0;
     short translateY=0;
 
+    /*
     if( y < 745 )
     {
       translateX=-180;
@@ -65,6 +62,7 @@ void DrawScreen( SDL_Surface *screen, short imgW, short imgH )
       translateX=-750;
       translateY=-745;
     }
+    */
 
     Uint32 color = (((*imgIt).r) << 24 ) |
                    (((*imgIt).g) << 16 ) |
@@ -189,7 +187,7 @@ bool Update( short imgW, short imgH )
   if( fullImage )
   {
     HandleReceivedImage( buffer );
-    //diffMode = true;
+    diffMode = true;
   }
   else
     HandleReceivedDiffs( buffer, imgW, imgH );
@@ -200,7 +198,7 @@ bool Update( short imgW, short imgH )
 
 int main( int argc, char* argv[] )
 {
-  image.resize( 1200*1200 );
+  image.resize( 450*910 );
   SDL_Surface *screen;
   int portno;
   struct sockaddr_in serv_addr;
@@ -231,7 +229,7 @@ int main( int argc, char* argv[] )
 
   if( SDL_Init( SDL_INIT_VIDEO ) < 0 ) return 1;
 
-  if( !(screen = SDL_SetVideoMode( WIDTH, HEIGHT, DEPTH, SDL_FULLSCREEN | SDL_HWSURFACE )) )
+  if( !(screen = SDL_SetVideoMode( WIDTH, HEIGHT, DEPTH, SDL_HWSURFACE )) )
   {
     SDL_Quit();
     return 1;
@@ -241,8 +239,8 @@ int main( int argc, char* argv[] )
 
   while( !quit )
   {
-    if( Update( 1200, 1200 ) )
-      DrawScreen( screen, 1200, 1200 );
+    if( Update( 450, 910 ) )
+      DrawScreen( screen, 450, 910 );
   }
 
   SDL_Quit();
