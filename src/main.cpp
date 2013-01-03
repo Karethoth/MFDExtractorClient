@@ -1,31 +1,18 @@
 #include "main.h"
 
 #define WIDTH 1024
-#define HEIGHT 1200
+#define HEIGHT 600
 #define DEPTH 32
 #define BPP 6
-
-typedef struct
-{
-  unsigned char r;
-  unsigned char g;
-  unsigned char b;
-} PIXEL;
-
-
-typedef struct
-{
-  unsigned short x;
-  unsigned short y;
-  PIXEL color;
-} PIXDIFF;
 
 int sockfd;
 bool firstUpdate = true;
 bool diffMode = false;
 
-std::vector<PIXEL> image;
-std::vector<PIXEL>::iterator imgIt;
+INI ini;
+AREA mainArea;
+std::vector<Surface*> surfaces;
+
 
 inline void EndianSwap( unsigned int &x )
 {
@@ -37,39 +24,12 @@ inline void EndianSwap( unsigned int &x )
 
 
 
-void DrawScreen( SDL_Surface *screen, short imgW, short imgH )
+void DrawScreen( SDL_Surface *screen )
 { 
-  short x=0, y=0;
-  for( imgIt = image.begin(); imgIt != image.end(); ++imgIt, ++x )
+  std::vector<Surface*>::iterator it;
+  for( it = surfaces.begin(); it != surfaces.end(); ++it )
   {
-    if( x >= imgW )
-    {
-      ++y;
-      x = 0;
-    }
-
-    short translateX=0;
-    short translateY=0;
-
-    /*
-    if( y < 745 )
-    {
-      translateX=-180;
-      translateY=-290;
-    }
-    else
-    {
-      translateX=-750;
-      translateY=-745;
-    }
-    */
-
-    Uint32 color = (((*imgIt).r) << 24 ) |
-                   (((*imgIt).g) << 16 ) |
-                   (((*imgIt).b) << 8 ) |
-                   0xff;
-    EndianSwap( color );
-    Draw_Pixel( screen, x+translateX, y+translateY, color );
+    (*it)->DrawTo( screen );
   }
 
   SDL_Flip( screen ); 
@@ -77,22 +37,27 @@ void DrawScreen( SDL_Surface *screen, short imgW, short imgH )
 
 
 
-void HandleReceivedDiffs( std::vector<char> &data, short imgW, short imgH )
+void HandleReceivedDiffs( std::vector<char> &data )
 {
+  PIXDIFF pixDiff;
   std::vector<char>::iterator it;
-  unsigned short tmpX, tmpY;
-  unsigned char r, g, b;
+  std::vector<Surface*>::iterator sit;
+
   for( it = data.begin(); it < data.end(); it+=7 )
   {
-    tmpX = ((*it)<<8) | (unsigned char)(*(it+1));
-    tmpY = (((*(it+2)<<8)) | (unsigned char)(*(it+3)) );
-    r = (unsigned char)*(it+4);
-    g = (unsigned char)*(it+5);
-    b = (unsigned char)*(it+6);
-    unsigned int pixelIndex = tmpY*imgW + tmpX;
-    image[pixelIndex].r = r;
-    image[pixelIndex].g = g;
-    image[pixelIndex].b = b;
+    pixDiff.x = ((*it)<<8) | (unsigned char)(*(it+1));
+    pixDiff.y = (((*(it+2)<<8)) | (unsigned char)(*(it+3)) );
+    pixDiff.color.r = (unsigned char)*(it+4);
+    pixDiff.color.g = (unsigned char)*(it+5);
+    pixDiff.color.b = (unsigned char)*(it+6);
+
+    for( sit = surfaces.begin(); sit != surfaces.end(); ++sit )
+    {
+      if( (*sit)->IsInArea( pixDiff.x, pixDiff.y ) )
+      {
+        (*sit)->UpdatePixel( pixDiff );
+      }
+    }
   }
 }
 
@@ -100,22 +65,40 @@ void HandleReceivedDiffs( std::vector<char> &data, short imgW, short imgH )
 
 void HandleReceivedImage( std::vector<char> &data )
 {
-  image.clear();
-
   std::vector<char>::iterator it;
-  PIXEL tmp;
-  for( it = data.begin(); it < data.end(); it+=3 )
+  std::vector<Surface*>::iterator sit;
+  PIXDIFF tmp;
+
+  unsigned short x=0;
+  unsigned short y=0;
+
+  for( it = data.begin(); it < data.end(); it+=3, ++x )
   {
-    tmp.r = *it;
-    tmp.g = *(it+1);
-    tmp.b = *(it+2);
-    image.push_back( tmp );
+    if( x >= mainArea.w )
+    {
+      x = 0;
+      ++y;
+    }
+
+    tmp.x = x;
+    tmp.y = y;
+    tmp.color.r = *it;
+    tmp.color.g = *(it+1);
+    tmp.color.b = *(it+2);
+
+    for( sit = surfaces.begin(); sit != surfaces.end(); ++sit )
+    {
+      if( (*sit)->IsInArea( tmp.x, tmp.y ) )
+      {
+        (*sit)->UpdatePixel( tmp );
+      }
+    }
   }
 }
 
 
 
-bool Update( short imgW, short imgH )
+bool Update()
 {
   std::vector<char> request;
   bool fullImage=false;
@@ -129,10 +112,10 @@ bool Update( short imgW, short imgH )
   else
     request.push_back( 'D' );
 
-  request.push_back( imgW>>8 );
-  request.push_back( imgW );
-  request.push_back( imgH>>8 );
-  request.push_back( imgH );
+  request.push_back( mainArea.w>>8 );
+  request.push_back( mainArea.w );
+  request.push_back( mainArea.h>>8 );
+  request.push_back( mainArea.h );
   request.push_back( '\n' );
   if( !diffMode )
     send( sockfd, &request[0], request.size(), 0 );
@@ -190,15 +173,59 @@ bool Update( short imgW, short imgH )
     diffMode = true;
   }
   else
-    HandleReceivedDiffs( buffer, imgW, imgH );
+    HandleReceivedDiffs( buffer );
   return true;
+}
+
+
+
+void LoadSurfaces()
+{
+  mainArea.x = atoi( ini["MAIN_AREA_X"].c_str() );
+  mainArea.y = atoi( ini["MAIN_AREA_Y"].c_str() );
+  mainArea.w = atoi( ini["MAIN_AREA_W"].c_str() );
+  mainArea.h = atoi( ini["MAIN_AREA_H"].c_str() );
+
+  for( int i=1 ;; ++i )
+  {
+    std::ostringstream stream;
+    stream << "SURFACE_" << i;
+    std::string  pre = stream.str();
+
+    std::string key = pre + "_X";
+    if( ini[key].length() <= 0 )
+      break;
+
+    AREA area, src;
+
+    area.x = atoi( ini[key].c_str() );
+
+    key = pre + "_Y";
+    area.y = atoi( ini[key].c_str() );
+
+    key = pre + "_W";
+    area.w = atoi( ini[key].c_str() );
+
+    key = pre + "_H";
+    area.h = atoi( ini[key].c_str() );
+
+    key = pre + "_SRC_X";
+    src.x = atoi( ini[key].c_str() );
+
+    key = pre + "_SRC_Y";
+    src.y = atoi( ini[key].c_str() );
+
+    Surface *newSurface = new Surface( area, src );
+    surfaces.push_back( newSurface );
+  }
 }
 
 
 
 int main( int argc, char* argv[] )
 {
-  image.resize( 450*910 );
+  ini.Load( "config.ini" );
+
   SDL_Surface *screen;
   int portno;
   struct sockaddr_in serv_addr;
@@ -235,12 +262,14 @@ int main( int argc, char* argv[] )
     return 1;
   }
 
+  LoadSurfaces();
+
   bool quit = false;
 
   while( !quit )
   {
-    if( Update( 450, 910 ) )
-      DrawScreen( screen, 450, 910 );
+    if( Update() )
+      DrawScreen( screen );
   }
 
   SDL_Quit();

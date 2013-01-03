@@ -17,10 +17,12 @@ TGT    = client
 DBGTGT = dclient
 
 
-OBJS = \
+OBJS = $(OBJDIR)/Surface.o \
+       $(OBJDIR)/INI.o \
        $(OBJDIR)/main.o
 
-DBGOBJS = \
+DBGOBJS = $(OBJDIR)/Surface.dbg.o \
+          $(OBJDIR)/INI.dbg.o \
 	  $(OBJDIR)/main.dbg.o
 
 
