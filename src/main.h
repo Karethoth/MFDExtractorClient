@@ -6,6 +6,7 @@
 #include <time.h>
 #include <SDL/SDL.h>
 #include <SDL/SDL_draw.h>
+#include <SDL/SDL_image.h>
 #include <vector>
 #include <sstream>
 
@@ -14,6 +15,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+
+#include <jpeglib.h>
 
 #include "INI.h"
 #include "Surface.h"

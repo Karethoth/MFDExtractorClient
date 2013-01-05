@@ -1,4 +1,5 @@
 #include "main.h"
+#include <fstream>
 
 #define WIDTH 1024
 #define HEIGHT 600
@@ -22,23 +23,44 @@ inline void EndianSwap( unsigned int &x )
       (x<<24);
 }
 
+SDL_Surface *jpg = NULL;
 
 
 void DrawScreen( SDL_Surface *screen )
 { 
-  std::vector<Surface*>::iterator it;
-  for( it = surfaces.begin(); it != surfaces.end(); ++it )
+  SDL_FillRect( screen, 0, 0 );
+  if( jpg )
   {
-    (*it)->DrawTo( screen );
+    SDL_Rect src = { 0,0, 450, 455 };
+    SDL_Rect dest = { 500, 0, 0, 0 };
+    SDL_BlitSurface( jpg, &src, screen, &dest );
+    src = { 0, 455, 450, 455 };
+    dest = { 0, 0, 0, 0 };
+    SDL_BlitSurface( jpg, &src, screen, &dest );
+  }
+  else
+  {
+    std::vector<Surface*>::iterator it;
+    for( it = surfaces.begin(); it != surfaces.end(); ++it )
+    {
+      (*it)->DrawTo( screen );
+    }
   }
 
-  SDL_Flip( screen ); 
+  SDL_Flip( screen );
 }
 
 
 
 void HandleReceivedDiffs( std::vector<char> &data )
 {
+  if( jpg )
+  {
+    SDL_FreeSurface( jpg );
+    jpg = NULL;
+  }
+
+
   PIXDIFF pixDiff;
   std::vector<char>::iterator it;
   std::vector<Surface*>::iterator sit;
@@ -65,6 +87,12 @@ void HandleReceivedDiffs( std::vector<char> &data )
 
 void HandleReceivedImage( std::vector<char> &data )
 {
+  if( jpg )
+  {
+    SDL_FreeSurface( jpg );
+    jpg = NULL;
+  }
+
   std::vector<char>::iterator it;
   std::vector<Surface*>::iterator sit;
   PIXDIFF tmp;
@@ -78,6 +106,10 @@ void HandleReceivedImage( std::vector<char> &data )
     {
       x = 0;
       ++y;
+    }
+    if( y >= mainArea.h )
+    {
+      break;
     }
 
     tmp.x = x;
@@ -94,6 +126,17 @@ void HandleReceivedImage( std::vector<char> &data )
       }
     }
   }
+}
+
+
+
+void HandleReceivedJPEG( std::vector<char> &data )
+{
+  SDL_RWops *rwop;
+  rwop = SDL_RWFromMem( data.data(), data.size() );
+  if( jpg )
+    SDL_FreeSurface( jpg );
+  jpg = IMG_LoadJPG_RW( rwop );
 }
 
 
@@ -120,7 +163,6 @@ bool Update()
   if( !diffMode )
     send( sockfd, &request[0], request.size(), 0 );
 
-
   char headerBuffer[6];
   int n;
 
@@ -137,7 +179,9 @@ bool Update()
   memcpy( &elementCount, (const void*)headerBuffer+1, 4 );
   EndianSwap( (unsigned int&)elementCount );
 
-  if( fullImage )
+  if( headerBuffer[0] == 'J' )
+    dataCount = elementCount;
+  else if( fullImage )
     dataCount = elementCount*3;
   else
     dataCount = elementCount*7;
@@ -167,7 +211,12 @@ bool Update()
     return false;
   }
 
-  if( fullImage )
+  if( headerBuffer[0] == 'J' )
+  {
+    HandleReceivedJPEG( buffer );
+    diffMode = true;
+  }
+  else if( fullImage )
   {
     HandleReceivedImage( buffer );
     diffMode = true;
@@ -224,12 +273,14 @@ void LoadSurfaces()
 
 int main( int argc, char* argv[] )
 {
+  SDL_Surface *screen;
   ini.Load( "config.ini" );
 
-  SDL_Surface *screen;
   int portno;
   struct sockaddr_in serv_addr;
   struct hostent *server;
+
+  printf( "trying to connect..\n" );
 
   portno = 45001;
   sockfd = socket( AF_INET, SOCK_STREAM, 0 );
@@ -256,7 +307,7 @@ int main( int argc, char* argv[] )
 
   if( SDL_Init( SDL_INIT_VIDEO ) < 0 ) return 1;
 
-  if( !(screen = SDL_SetVideoMode( WIDTH, HEIGHT, DEPTH, SDL_HWSURFACE )) )
+  if( !(screen = SDL_SetVideoMode( WIDTH, HEIGHT, DEPTH, SDL_DOUBLEBUF | SDL_HWSURFACE )) )
   {
     SDL_Quit();
     return 1;

@@ -4,13 +4,13 @@ BINDIR = bin
 
 DIRS = $(OBJDIR) $(BINDIR)
 
-LIBS = -lSDL -lSDL_draw -lSDL_ttf -lm
+LIBS = -lSDL -lSDL_draw -lSDL_image -lm -ljpeg
 
 CC    = g++
 CWARN = -W -Wall -Wshadow -Wreturn-type -Wformat -Wparentheses -Wpointer-arith -Wuninitialized -O
 CDBG  = -g $(CWARN) -fno-inline
 
-CFLAGS = $(CDBG) #-fpack-struct
+CFLAGS = -O3 #-fpack-struct
 DFLAGS = -g $(CWARN)
 
 TGT    = client
