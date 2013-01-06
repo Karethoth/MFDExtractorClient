@@ -32,7 +32,7 @@ void DrawScreen( SDL_Surface *screen )
   if( jpg )
   {
     SDL_Rect src = { 0,0, 450, 455 };
-    SDL_Rect dest = { 500, 0, 0, 0 };
+    SDL_Rect dest = { 575, 0, 0, 0 };
     SDL_BlitSurface( jpg, &src, screen, &dest );
     src = { 0, 455, 450, 455 };
     dest = { 0, 0, 0, 0 };
@@ -320,7 +320,9 @@ int main( int argc, char* argv[] )
   while( !quit )
   {
     if( Update() )
+    {
       DrawScreen( screen );
+    }
   }
 
   SDL_Quit();
