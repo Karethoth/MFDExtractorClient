@@ -14,8 +14,6 @@ Surface::Surface( AREA area, AREA source )
                                      0x00ff0000,
                                      0xff000000,
                                      0x000000ff );
-  /* TODO:
-   * Check if we succeeded at creating the surface. */
 }
 
 

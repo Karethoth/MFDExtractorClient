@@ -4,12 +4,6 @@
 #include <algorithm>
 
 
-INI::~INI()
-{
-        pairs.clear();
-}
-
-
 
 bool INI::Load( std::string filepath )
 {

@@ -287,7 +287,7 @@ int main( int argc, char* argv[] )
   if( sockfd < 0 )
     printf( "ERROR opening socket!\n" );
 
-  server = gethostbyname( "192.168.2.2" );
+  server = gethostbyname( ini["HOST"].c_str() );
   if( server == NULL )
     printf( "ERROR, no such host!\n" );
 

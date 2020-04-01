@@ -1,4 +1,3 @@
-#pragma once
 #ifndef __SURFACE_H__
 #define __SURFACE_H__
 
